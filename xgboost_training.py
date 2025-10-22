@@ -10,6 +10,7 @@ from sklearn.metrics import (
 from xgboost import XGBClassifier
 import matplotlib.pyplot as plt
 import seaborn as sns
+import os
 
 # ========================================
 # load and preprocess the data
@@ -64,3 +65,50 @@ model.fit(X_train, y_train)
 y_pred = model.predict(X_test)
 y_pred_proba = model.predict_proba(X_test)[:, 1]
 
+# ========================================
+# evaluation metrics
+# ========================================
+
+os.makedirs("results", exist_ok=True)
+
+# classification report
+print("\nclassification report:")
+print(classification_report(y_test, y_pred, digits=4))
+
+# confusion matrix
+cm = confusion_matrix(y_test, y_pred)
+plt.figure(figsize=(6, 4))
+sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', cbar=False)
+plt.xlabel('Predicted')
+plt.ylabel('Actual')
+plt.title('Confusion Matrix')
+plt.savefig('results/confusion_matrix.png')
+plt.show()
+
+# roc curve and auc
+fpr, tpr, thresholds = roc_curve(y_test, y_pred_proba)
+roc_auc = roc_auc_score(y_test, y_pred_proba)
+plt.figure(figsize=(6, 4))
+plt.plot(fpr, tpr, label=f"ROC AUC = {roc_auc:.4f}")
+plt.plot([0, 1], [0, 1], 'r--')
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.title('ROC Curve')
+plt.legend()
+plt.savefig('results/roc_curve.png')
+plt.show()
+
+# precision-recall curve
+precision, recall, thresholds = precision_recall_curve(y_test, y_pred_proba)
+pr_auc = auc(recall, precision)
+plt.figure(figsize=(6, 4))
+plt.plot(recall, precision, label=f"PR AUC = {pr_auc:.4f}")
+plt.xlabel('Recall')
+plt.ylabel('Precision')
+plt.title('Precision-Recall Curve')
+plt.legend()
+plt.savefig('results/precision_recall_curve.png')
+plt.show()
+
+print(f"\nROC-AUC: {roc_auc:.4f}")
+print(f"PR-AUC: {pr_auc:.4f}")
