@@ -38,3 +38,21 @@ X_train, X_test, y_train, y_test = train_test_split(
 
 scale_pos_weight = len(y_train[y_train == 0]) / len(y_train[y_train == 1])
 print("scale_pos_weight:", scale_pos_weight)
+
+# ========================================
+# train XGBoost model
+# ========================================
+
+model = XGBClassifier(
+    n_estimators=400,
+    learning_rate=0.05,
+    max_depth=5,
+    subsample=0.8,
+    colsample_bytree=0.8,
+    scale_pos_weight=scale_pos_weight,
+    eval_metric='auc',
+    use_label_encoder=False,
+    random_state=42
+)
+
+model.fit(X_train, y_train)
