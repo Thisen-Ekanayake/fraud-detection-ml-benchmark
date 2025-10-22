@@ -10,6 +10,7 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 import os
+import numpy as np
 
 
 # ========================================
@@ -94,3 +95,15 @@ plt.savefig(f'{save_dir}/precision-recall_curve.png')
 
 print(f"ROC-AUC: {roc_auc:.4f}")
 print(f"PR-AUC: {pr_auc:.4f}")
+
+# ========================================
+# feature importance
+# ========================================
+
+plt.figure(figsize=(10,6))
+rf_importances = model.feature_importances_
+sorted_idx = np.argsort(rf_importances)[::-1][:10]
+sns.barplot(x=X.columns[sorted_idx], y=rf_importances[sorted_idx])
+plt.title("Top 10 Feature Importances")
+plt.xticks(rotation=45)
+plt.savefig(f'{save_dir}/feature_importance.png')
