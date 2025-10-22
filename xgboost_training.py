@@ -31,3 +31,10 @@ X[['Time', 'Amount']] = scaler.fit_transform(X[['Time', 'Amount']])
 X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=42, stratify=y
 )
+
+# ==================================================
+# handle class imbalance with scale_pos_weight
+# ==================================================
+
+scale_pos_weight = len(y_train[y_train == 0]) / len(y_train[y_train == 1])
+print("scale_pos_weight:", scale_pos_weight)
