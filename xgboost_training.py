@@ -11,6 +11,9 @@ from xgboost import XGBClassifier
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+# ========================================
+# load and preprocess the data
+# ========================================
 df = pd.read_csv('creditcard.csv')
 
 print("dataset shape:", df.shape)
