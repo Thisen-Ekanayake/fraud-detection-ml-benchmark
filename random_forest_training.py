@@ -11,6 +11,11 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 import os
 
+
+# ========================================
+# load and preprocess the data
+# ========================================
+
 df = pd.read_csv('creditcard.csv')
 
 X = df.drop('Class', axis=1)
