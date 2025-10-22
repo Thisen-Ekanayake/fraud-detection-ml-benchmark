@@ -112,3 +112,15 @@ plt.show()
 
 print(f"\nROC-AUC: {roc_auc:.4f}")
 print(f"PR-AUC: {pr_auc:.4f}")
+
+# ========================================
+# feature importance
+# ========================================
+plt.figure(figsize=(10, 6))
+xgb_importance = model.feature_importances_
+sorted_idx = np.argsort(xgb_importance)[::-1][:10]
+sns.barplot(x=X.columns[sorted_idx], y=xgb_importance[sorted_idx])
+plt.title('Top 10 Feature Importances')
+plt.xticks(rotation=45)
+plt.savefig('results/feature_importances.png')
+plt.show()
