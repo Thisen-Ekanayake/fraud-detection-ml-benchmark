@@ -69,11 +69,13 @@ y_pred_proba = model.predict_proba(X_test)[:, 1]
 # evaluation metrics
 # ========================================
 
-os.makedirs("results", exist_ok=True)
+save_dir = "results_1"
+os.makedirs(save_dir, exist_ok=True)
 
 # classification report
-print("\nclassification report:")
-print(classification_report(y_test, y_pred, digits=4))
+with open(f'{save_dir}/classification_report.txt', 'w') as f:
+    f.write("classification report:\n")
+    f.write(classification_report(y_test, y_pred, digits=4))
 
 # confusion matrix
 cm = confusion_matrix(y_test, y_pred)
@@ -82,7 +84,7 @@ sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', cbar=False)
 plt.xlabel('Predicted')
 plt.ylabel('Actual')
 plt.title('Confusion Matrix')
-plt.savefig('results/confusion_matrix.png')
+plt.savefig(f'{save_dir}/confusion_matrix.png')
 
 # roc curve and auc
 fpr, tpr, thresholds = roc_curve(y_test, y_pred_proba)
@@ -94,7 +96,7 @@ plt.xlabel('False Positive Rate')
 plt.ylabel('True Positive Rate')
 plt.title('ROC Curve')
 plt.legend()
-plt.savefig('results/roc_curve.png')
+plt.savefig(f'{save_dir}/roc_curve.png')
 
 # precision-recall curve
 precision, recall, thresholds = precision_recall_curve(y_test, y_pred_proba)
@@ -105,7 +107,7 @@ plt.xlabel('Recall')
 plt.ylabel('Precision')
 plt.title('Precision-Recall Curve')
 plt.legend()
-plt.savefig('results/precision_recall_curve.png')
+plt.savefig(f'{save_dir}/precision_recall_curve.png')
 
 print(f"\nROC-AUC: {roc_auc:.4f}")
 print(f"PR-AUC: {pr_auc:.4f}")
@@ -119,4 +121,4 @@ sorted_idx = np.argsort(xgb_importance)[::-1][:10]
 sns.barplot(x=X.columns[sorted_idx], y=xgb_importance[sorted_idx])
 plt.title('Top 10 Feature Importances')
 plt.xticks(rotation=45)
-plt.savefig('results/feature_importances.png')
+plt.savefig(f'{save_dir}/feature_importances.png')
