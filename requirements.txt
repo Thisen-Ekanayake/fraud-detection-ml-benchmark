@@ -1,0 +1,16 @@
+# Core
+numpy
+pandas
+scikit-learn
+xgboost
+imbalanced-learn
+matplotlib
+seaborn
+
+# For neural network baseline
+torch
+torchvision
+torchaudio
+
+# For Jupyter notebooks
+jupyter
