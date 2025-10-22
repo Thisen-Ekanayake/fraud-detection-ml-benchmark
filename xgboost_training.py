@@ -83,7 +83,6 @@ plt.xlabel('Predicted')
 plt.ylabel('Actual')
 plt.title('Confusion Matrix')
 plt.savefig('results/confusion_matrix.png')
-plt.show()
 
 # roc curve and auc
 fpr, tpr, thresholds = roc_curve(y_test, y_pred_proba)
@@ -96,7 +95,6 @@ plt.ylabel('True Positive Rate')
 plt.title('ROC Curve')
 plt.legend()
 plt.savefig('results/roc_curve.png')
-plt.show()
 
 # precision-recall curve
 precision, recall, thresholds = precision_recall_curve(y_test, y_pred_proba)
@@ -108,7 +106,6 @@ plt.ylabel('Precision')
 plt.title('Precision-Recall Curve')
 plt.legend()
 plt.savefig('results/precision_recall_curve.png')
-plt.show()
 
 print(f"\nROC-AUC: {roc_auc:.4f}")
 print(f"PR-AUC: {pr_auc:.4f}")
@@ -123,4 +120,3 @@ sns.barplot(x=X.columns[sorted_idx], y=xgb_importance[sorted_idx])
 plt.title('Top 10 Feature Importances')
 plt.xticks(rotation=45)
 plt.savefig('results/feature_importances.png')
-plt.show()
