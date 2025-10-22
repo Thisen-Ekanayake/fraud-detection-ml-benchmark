@@ -56,3 +56,11 @@ model = XGBClassifier(
 )
 
 model.fit(X_train, y_train)
+
+# ========================================
+# predictions and probabilities
+# ========================================
+
+y_pred = model.predict(X_test)
+y_pred_proba = model.predict_proba(X_test)[:, 1]
+
