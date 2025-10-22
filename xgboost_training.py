@@ -69,7 +69,7 @@ y_pred_proba = model.predict_proba(X_test)[:, 1]
 # evaluation metrics
 # ========================================
 
-save_dir = "results_1"
+save_dir = "results_1/xgboost"
 os.makedirs(save_dir, exist_ok=True)
 
 # classification report
