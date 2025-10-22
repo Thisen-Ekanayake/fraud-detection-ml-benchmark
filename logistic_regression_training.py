@@ -1,6 +1,11 @@
 import pandas as pd
 import numpy as np
-from sklearn.model_selection import train_test_split
+import matplotlib.pyplot as plt
+import seaborn as sns
+import os
+import json
+
+from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
@@ -8,9 +13,6 @@ from sklearn.metrics import (
     roc_auc_score, precision_recall_curve,
     auc, roc_curve
 )
-import matplotlib.pyplot as plt
-import seaborn as sns
-import os
 
 
 # ========================================
@@ -32,34 +34,52 @@ X_train, X_test, y_train, y_test = train_test_split(
 )
 
 # ========================================
-# handle imbalance using class weights
+# grid search cv
 # ========================================
 
-model = LogisticRegression(
-    solver='lbfgs',
-    max_iter=1000,
-    class_weight='balanced', # balance fraud vs non-fraud
-    random_state=42
+param_grid = {
+    'C': [0.01, 0.1, 1, 10, 100],
+    'solver': ['lbfgs', 'liblinear', 'saga'],
+    'penalty': ['l2'],
+    'class_weight': ['balanced', None],
+    'max_iter': [100, 500, 1000]
+}
+
+log_reg = LogisticRegression(random_state=42)
+
+grid_search = GridSearchCV(
+    estimator=log_reg,
+    param_grid=param_grid,
+    scoring='roc_auc',
+    cv=5,
+    n_jobs=-1,
+    verbose=2
 )
 
-# ========================================
-# train model
-# ========================================
+print("running grid search cv...")
+grid_search.fit(X_train, y_train)
 
-model.fit(X_train, y_train)
-
-# ========================================
-# predictions
-# ========================================
-y_pred = model.predict(X_test)
-y_pred_proba = model.predict_proba(X_test)[:, 1]
+best_model = grid_search.best_estimator_
+print("best hyperparameters:\n", grid_search.best_params_)
+print(f"best CV ROC-AUC: {grid_search.best_score_:.4f}")
 
 # ========================================
-# evaluation
+# save best parameters
 # ========================================
 
-save_dir = 'results_1/logistic_regression'
+save_dir = 'results_best/logistic_regression'
 os.makedirs(save_dir, exist_ok=True)
+
+with open(f'{save_dir}/best_hyperparameters.json', 'w') as f:
+    json.dump(grid_search.best_params_, f, indent=4)
+
+# ========================================
+# train best model and evaluate
+# ========================================
+
+y_pred = best_model.predict(X_test)
+y_pred_proba = best_model.predict_proba(X_test)[:, 1]
+
 
 with open(f'{save_dir}/classification_report.txt', 'w') as f:
     f.write("classification report:\n")
