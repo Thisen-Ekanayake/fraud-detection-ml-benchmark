@@ -103,3 +103,58 @@ for epoch in range(epochs):
     epoch_loss /= len(train_loader.dataset)
     if (epoch+1) % 5 == 0:
         print(f"epoch {epoch+1}/{epochs}, loss: {epoch_loss:.6f}")
+
+# ========================================
+# predictions
+# ========================================
+
+model.eval()
+with torch.no_grad():
+    y_pred_proba = model(X_test_tensor).cpu().numpy().flatten()
+    y_pred = (y_pred_proba >= 0.5).astype(int)
+
+# ========================================
+# evaluation metrics
+# ========================================
+
+save_dir = 'results_1/neural_network'
+os.makedirs(save_dir, exist_ok=True)
+
+with open(f'{save_dir}/classification_report.txt', 'w') as f:
+    f.write("classification report:\n")
+    f.write(classification_report(y_test, y_pred, digits=4))
+
+# confusion matrix
+cm = confusion_matrix(y_test, y_pred)
+plt.figure(figsize=(6,4))
+sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', cbar=False)
+plt.title("Confusion Matrix - PyTorch NN")
+plt.xlabel("Predicted")
+plt.ylabel("Actual")
+plt.savefig(f'{save_dir}/confusion_matrix.png')
+
+# roc curve
+fpr, tpr, thresholds = roc_curve(y_test, y_pred_proba)
+roc_auc = roc_auc_score(y_test, y_pred_proba)
+plt.figure(figsize=(6,4))
+plt.plot(fpr, tpr, label=f"ROC AUC = {roc_auc:.4f}")
+plt.plot([0,1], [0,1], 'r--')
+plt.xlabel("False Positive Rate")
+plt.ylabel("True Positive Rate")
+plt.title("ROC Curve - PyTorch NN")
+plt.legend()
+plt.savefig(f'{save_dir}/roc_curve.png')
+
+# precision-recall curve
+precision, recall, thresholds = precision_recall_curve(y_test, y_pred_proba)
+pr_auc = auc(recall, precision)
+plt.figure(figsize=(6,4))
+plt.plot(recall, precision, label=f"PR AUC = {pr_auc:.4f}")
+plt.xlabel("Recall")
+plt.ylabel("Precision")
+plt.title("Precision-Recall Curve - PyTorch NN")
+plt.legend()
+plt.savefig(f'{save_dir}/precision-recall_curve.png')
+
+print(f"ROC-AUC: {roc_auc:.4f}")
+print(f"PR-AUC: {pr_auc:.4f}")
