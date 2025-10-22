@@ -64,3 +64,42 @@ class FraudMLP(nn.Module):
         return self.model(x)
 
 model = FraudMLP(X_train.shape[1])
+
+# ========================================
+# loss & optimizer
+# ========================================
+
+# handle imbalance using pos_weight
+neg, pos = np.bincount(y_train)
+pos_weight = torch.tensor([neg / pos], dtype=torch.float32)
+
+criterion = nn.BCELoss()
+optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model = model.to(device)
+X_train_tensor = X_train_tensor.to(device)
+y_train_tensor = y_train_tensor.to(device)
+X_test_tensor = X_test_tensor.to(device)
+y_test_tensor = y_test_tensor.to(device)
+
+# ========================================
+# training loop
+# ========================================
+
+epochs = 50
+for epoch in range(epochs):
+    model.train()
+    epoch_loss = 0
+    for xb, yb in train_loader:
+        xb, yb = xb.to(device), yb.to(device)
+        optimizer.zero_grad()
+        outputs = model(xb)
+        loss = criterion(outputs, yb)
+        loss.backward()
+        optimizer.step()
+        epoch_loss += loss.item() * xb.size(0)
+    
+    epoch_loss /= len(train_loader.dataset)
+    if (epoch+1) % 5 == 0:
+        print(f"epoch {epoch+1}/{epochs}, loss: {epoch_loss:.6f}")
