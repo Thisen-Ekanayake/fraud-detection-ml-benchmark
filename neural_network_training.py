@@ -41,3 +41,26 @@ y_test_tensor = torch.tensor(y_test.values, dtype=torch.float32).unsqueeze(1)
 # create dataloader
 train_dataset = TensorDataset(X_train_tensor, y_train_tensor)
 train_loader = DataLoader(train_dataset, batch_size=2048, shuffle=True)
+
+# ========================================
+# define neural network
+# ========================================
+
+class FraudMLP(nn.Module):
+    def __init__(self, input_dim):
+        super(FraudMLP, self).__init__()
+        self.model = nn.Sequential(
+            nn.Linear(input_dim, 64),
+            nn.ReLU(),
+            nn.Dropout(0.3),
+            nn.Linear(64, 32),
+            nn.ReLU(),
+            nn.Dropout(0.2),
+            nn.Linear(32, 1),
+            nn.Sigmoid()
+        )
+        
+    def forward(self, x):
+        return self.model(x)
+
+model = FraudMLP(X_train.shape[1])
