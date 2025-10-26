@@ -14,3 +14,6 @@ torchaudio
 
 # For Jupyter notebooks
 jupyter
+
+# For progress bar
+tqdm
