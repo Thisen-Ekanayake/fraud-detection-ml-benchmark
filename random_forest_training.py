@@ -3,8 +3,10 @@ import numpy as np
 import os
 import matplotlib.pyplot as plt
 import seaborn as sns
+from tqdm import tqdm
+from itertools import product
 
-from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import (
@@ -14,7 +16,7 @@ from sklearn.metrics import (
 )
 
 # ========================================
-# load and preprocess the data
+# load and preprocess data
 # ========================================
 
 df = pd.read_csv('creditcard.csv')
@@ -30,10 +32,8 @@ X_train, X_test, y_train, y_test = train_test_split(
 )
 
 # ========================================
-# grid search for best random forest
+# grid search
 # ========================================
-
-rf = RandomForestClassifier(random_state=42, n_jobs=-1, class_weight='balanced')
 
 param_grid = {
     'n_estimators': [100, 200, 300],
@@ -43,24 +43,58 @@ param_grid = {
     'max_features': ['sqrt', 'log2', None]
 }
 
-grid_search = GridSearchCV(
-    estimator=rf,
-    param_grid=param_grid,
-    scoring='roc_auc',  
-    cv=5,
-    n_jobs=-1,
-    verbose=2
-)
+param_grid_list = list(product(
+    param_grid['n_estimators'],
+    param_grid['max_depth'],
+    param_grid['min_samples_split'],
+    param_grid['min_samples_leaf'],
+    param_grid['max_features']
+))
 
-grid_search.fit(X_train, y_train)
+best_score = 0
+best_params = None
 
-best_model = grid_search.best_estimator_
+print(f"Total combinations: {len(param_grid_list)}")
 
-print("best parameters:", grid_search.best_params_)
-print("best ROC-AUC on training cv:", grid_search.best_score_)
+for n_estimators, max_depth, min_samples_split, min_samples_leaf, max_features in tqdm(param_grid_list, desc="Grid Search"):
+    model = RandomForestClassifier(
+        n_estimators=n_estimators,
+        max_depth=max_depth,
+        min_samples_split=min_samples_split,
+        min_samples_leaf=min_samples_leaf,
+        max_features=max_features,
+        class_weight='balanced',
+        random_state=42,
+        n_jobs=-1  # use all CPU cores
+    )
+    score = cross_val_score(model, X_train, y_train, cv=5, scoring='roc_auc', n_jobs=-1).mean()
+    if score > best_score:
+        best_score = score
+        best_params = {
+            'n_estimators': n_estimators,
+            'max_depth': max_depth,
+            'min_samples_split': min_samples_split,
+            'min_samples_leaf': min_samples_leaf,
+            'max_features': max_features
+        }
+
+print("Best params:", best_params)
+print("Best CV ROC-AUC:", best_score)
 
 # ========================================
-# predictions with best model
+# fit the best model
+# ========================================
+
+best_model = RandomForestClassifier(
+    **best_params,
+    class_weight='balanced',
+    random_state=42,
+    n_jobs=-1
+)
+best_model.fit(X_train, y_train)
+
+# ========================================
+# predictions
 # ========================================
 
 y_pred = best_model.predict(X_test)
@@ -75,7 +109,7 @@ os.makedirs(save_dir, exist_ok=True)
 
 # classification report
 with open(f'{save_dir}/classification_report.txt', 'w') as f:
-    f.write("classification report:\n")
+    f.write("Classification report:\n")
     f.write(classification_report(y_test, y_pred, digits=4))
 
 # confusion matrix
