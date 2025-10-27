@@ -12,112 +12,155 @@ from sklearn.metrics import (
 import matplotlib.pyplot as plt
 import seaborn as sns
 import os
-
+import optuna
 
 # ========================================
 # load and preprocess the data
 # ========================================
 
 df = pd.read_csv("creditcard.csv")
-
 X = df.drop('Class', axis=1)
 y = df['Class']
 
-# scale features
 scaler = StandardScaler()
 X_scaled = scaler.fit_transform(X)
 
-# train-test split
 X_train, X_test, y_train, y_test = train_test_split(
     X_scaled, y, test_size=0.2, random_state=42, stratify=y
 )
 
-# convert to pytorch tensors
 X_train_tensor = torch.tensor(X_train, dtype=torch.float32)
 y_train_tensor = torch.tensor(y_train.values, dtype=torch.float32).unsqueeze(1)
 X_test_tensor = torch.tensor(X_test, dtype=torch.float32)
 y_test_tensor = torch.tensor(y_test.values, dtype=torch.float32).unsqueeze(1)
 
-# create dataloader
 train_dataset = TensorDataset(X_train_tensor, y_train_tensor)
-train_loader = DataLoader(train_dataset, batch_size=2048, shuffle=True)
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # ========================================
-# define neural network
+# define optuna objective function
 # ========================================
 
-class FraudMLP(nn.Module):
+def objective(trial):
+    # hyperparameters
+    hidden1 = trial.suggest_int("hidden1", 32, 128)
+    hidden2 = trial.suggest_int("hidden2", 16, 64)
+    dropout1 = trial.suggest_float("dropout1", 0.1, 0.5)
+    dropout2 = trial.suggest_float("dropout2", 0.1, 0.5)
+    lr = trial.suggest_float("lr", 1e-4, 1e-2, log=True)
+    batch_size = trial.suggest_categorical("batch_size", [512, 1024, 2048])
+    
+    # dataloader
+    train_loader = DataLoader(
+        train_dataset, batch_size=batch_size, shuffle=True, num_workers=os.cpu_count()
+    )
+
+    # model definition
+    class TrialMLP(nn.Module):
+        def __init__(self, input_dim):
+            super().__init__()
+            self.model = nn.Sequential(
+                nn.Linear(input_dim, hidden1),
+                nn.ReLU(),
+                nn.Dropout(dropout1),
+                nn.Linear(hidden1, hidden2),
+                nn.ReLU(),
+                nn.Dropout(dropout2),
+                nn.Linear(hidden2, 1),
+                nn.Sigmoid()
+            )
+        def forward(self, x):
+            return self.model(x)
+
+    model = TrialMLP(X_train.shape[1]).to(device)
+    criterion = nn.BCELoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+
+    # training loop (short for tuning speed)
+    epochs = 20
+    model.train()
+    for epoch in range(epochs):
+        for xb, yb in train_loader:
+            xb, yb = xb.to(device), yb.to(device)
+            optimizer.zero_grad()
+            loss = criterion(model(xb), yb)
+            loss.backward()
+            optimizer.step()
+
+    # evaluate
+    model.eval()
+    with torch.no_grad():
+        y_pred_proba = model(X_test_tensor.to(device)).cpu().numpy().flatten()
+    
+    roc_auc = roc_auc_score(y_test, y_pred_proba)
+    return roc_auc
+
+# ========================================
+# run optuna
+# ========================================
+
+study = optuna.create_study(direction="maximize")
+study.optimize(objective, n_trials=30)  
+
+best_params = study.best_params
+print("Best hyperparameters:", best_params)
+print("Best ROC-AUC:", study.best_value)
+
+# ========================================
+# final model with best hyperparameters
+# ========================================
+
+final_batch_size = best_params["batch_size"]
+final_loader = DataLoader(
+    train_dataset, batch_size=final_batch_size, shuffle=True, num_workers=os.cpu_count()
+)
+
+class FinalMLP(nn.Module):
     def __init__(self, input_dim):
-        super(FraudMLP, self).__init__()
+        super().__init__()
         self.model = nn.Sequential(
-            nn.Linear(input_dim, 64),
+            nn.Linear(input_dim, best_params["hidden1"]),
             nn.ReLU(),
-            nn.Dropout(0.3),
-            nn.Linear(64, 32),
+            nn.Dropout(best_params["dropout1"]),
+            nn.Linear(best_params["hidden1"], best_params["hidden2"]),
             nn.ReLU(),
-            nn.Dropout(0.2),
-            nn.Linear(32, 1),
+            nn.Dropout(best_params["dropout2"]),
+            nn.Linear(best_params["hidden2"], 1),
             nn.Sigmoid()
         )
-        
     def forward(self, x):
         return self.model(x)
 
-model = FraudMLP(X_train.shape[1])
-
-# ========================================
-# loss & optimizer
-# ========================================
-
-# handle imbalance using pos_weight
-neg, pos = np.bincount(y_train)
-pos_weight = torch.tensor([neg / pos], dtype=torch.float32)
-
+model = FinalMLP(X_train.shape[1]).to(device)
 criterion = nn.BCELoss()
-optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model = model.to(device)
-X_train_tensor = X_train_tensor.to(device)
-y_train_tensor = y_train_tensor.to(device)
-X_test_tensor = X_test_tensor.to(device)
-y_test_tensor = y_test_tensor.to(device)
-
-# ========================================
-# training loop
-# ========================================
+optimizer = torch.optim.Adam(model.parameters(), lr=best_params["lr"])
 
 epochs = 50
 for epoch in range(epochs):
     model.train()
     epoch_loss = 0
-    for xb, yb in train_loader:
+    for xb, yb in final_loader:
         xb, yb = xb.to(device), yb.to(device)
         optimizer.zero_grad()
-        outputs = model(xb)
-        loss = criterion(outputs, yb)
+        loss = criterion(model(xb), yb)
         loss.backward()
         optimizer.step()
         epoch_loss += loss.item() * xb.size(0)
-    
-    epoch_loss /= len(train_loader.dataset)
+    epoch_loss /= len(final_loader.dataset)
     if (epoch+1) % 5 == 0:
         print(f"epoch {epoch+1}/{epochs}, loss: {epoch_loss:.6f}")
 
 # ========================================
-# predictions
+# evaluation
 # ========================================
 
 model.eval()
 with torch.no_grad():
-    y_pred_proba = model(X_test_tensor).cpu().numpy().flatten()
+    y_pred_proba = model(X_test_tensor.to(device)).cpu().numpy().flatten()
     y_pred = (y_pred_proba >= 0.5).astype(int)
 
-# ========================================
-# evaluation metrics
-# ========================================
-
-save_dir = 'results_1/neural_network'
+save_dir = 'results_best/neural_network'
 os.makedirs(save_dir, exist_ok=True)
 
 with open(f'{save_dir}/classification_report.txt', 'w') as f:
