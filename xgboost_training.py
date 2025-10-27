@@ -1,5 +1,7 @@
 import pandas as pd
 import numpy as np
+import os
+import optuna
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import (
@@ -10,72 +12,110 @@ from sklearn.metrics import (
 from xgboost import XGBClassifier
 import matplotlib.pyplot as plt
 import seaborn as sns
-import os
 
 # ========================================
 # load and preprocess the data
 # ========================================
 df = pd.read_csv('creditcard.csv')
 
-print("dataset shape:", df.shape)
+print("Dataset shape:", df.shape)
 print(df['Class'].value_counts())
 
-# separate features and target variable
+# separate features and target
 X = df.drop('Class', axis=1)
 y = df['Class']
 
-# scaling
+# scale time & amount
 scaler = StandardScaler()
 X[['Time', 'Amount']] = scaler.fit_transform(X[['Time', 'Amount']])
 
-# train-test split (stratify = same class imbalance)
+# train-test split (stratified to handle imbalance)
 X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=42, stratify=y
 )
 
-# ==================================================
-# handle class imbalance with scale_pos_weight
-# ==================================================
-
+# compute scale_pos_weight for imbalance handling
 scale_pos_weight = len(y_train[y_train == 0]) / len(y_train[y_train == 1])
 print("scale_pos_weight:", scale_pos_weight)
 
 # ========================================
-# train XGBoost model
+# optuna objective function
 # ========================================
+def objective(trial):
+    params = {
+        'n_estimators': trial.suggest_int('n_estimators', 200, 800),
+        'learning_rate': trial.suggest_float('learning_rate', 0.001, 0.3, log=True),
+        'max_depth': trial.suggest_int('max_depth', 3, 10),
+        'subsample': trial.suggest_float('subsample', 0.5, 1.0),
+        'colsample_bytree': trial.suggest_float('colsample_bytree', 0.5, 1.0),
+        'gamma': trial.suggest_float('gamma', 0.0, 5.0),
+        'min_child_weight': trial.suggest_int('min_child_weight', 1, 10),
+        'scale_pos_weight': scale_pos_weight,
+        'eval_metric': 'auc',
+        'use_label_encoder': False,
+        'random_state': 42,
+        'n_jobs': -1,
+    }
 
-model = XGBClassifier(
-    n_estimators=400,
-    learning_rate=0.05,
-    max_depth=5,
-    subsample=0.8,
-    colsample_bytree=0.8,
-    scale_pos_weight=scale_pos_weight,
-    eval_metric='auc',
-    use_label_encoder=False,
-    random_state=42
-)
+    model = XGBClassifier(**params)
 
-model.fit(X_train, y_train)
+    model.fit(
+        X_train, y_train,
+        eval_set=[(X_test, y_test)],
+        early_stopping_rounds=30,
+        verbose=False
+    )
+
+    y_pred_proba = model.predict_proba(X_test)[:, 1]
+    roc_auc = roc_auc_score(y_test, y_pred_proba)
+    return roc_auc
+
 
 # ========================================
-# predictions and probabilities
+# run optuna hyperparameter tuning
 # ========================================
+print("\nStarting Optuna hyperparameter tuning...\n")
+study = optuna.create_study(direction='maximize')
+study.optimize(objective, n_trials=30, show_progress_bar=True)
 
-y_pred = model.predict(X_test)
-y_pred_proba = model.predict_proba(X_test)[:, 1]
+print("\nBest ROC-AUC score:", study.best_value)
+print("Best hyperparameters:")
+for key, value in study.best_params.items():
+    print(f"  {key}: {value}")
 
 # ========================================
-# evaluation metrics
+# train final model using best parameters
 # ========================================
+best_params = study.best_params
+best_params.update({
+    'scale_pos_weight': scale_pos_weight,
+    'eval_metric': 'auc',
+    'use_label_encoder': False,
+    'random_state': 42,
+    'n_jobs': -1
+})
 
-save_dir = "results_1/xgboost"
+final_model = XGBClassifier(**best_params)
+final_model.fit(X_train, y_train)
+
+# ========================================
+# predictions
+# ========================================
+y_pred = final_model.predict(X_test)
+y_pred_proba = final_model.predict_proba(X_test)[:, 1]
+
+# ========================================
+# evaluate and save results
+# ========================================
+save_dir = "results_best/xgboost"
 os.makedirs(save_dir, exist_ok=True)
 
 # classification report
-with open(f'{save_dir}/classification_report.txt', 'w') as f:
-    f.write("classification report:\n")
+report_path = os.path.join(save_dir, "classification_report.txt")
+with open(report_path, 'w') as f:
+    f.write("Classification Report:\n")
     f.write(classification_report(y_test, y_pred, digits=4))
+print(f"\nClassification report saved to {report_path}")
 
 # confusion matrix
 cm = confusion_matrix(y_test, y_pred)
@@ -86,8 +126,8 @@ plt.ylabel('Actual')
 plt.title('Confusion Matrix')
 plt.savefig(f'{save_dir}/confusion_matrix.png')
 
-# roc curve and auc
-fpr, tpr, thresholds = roc_curve(y_test, y_pred_proba)
+# roc curve
+fpr, tpr, _ = roc_curve(y_test, y_pred_proba)
 roc_auc = roc_auc_score(y_test, y_pred_proba)
 plt.figure(figsize=(6, 4))
 plt.plot(fpr, tpr, label=f"ROC AUC = {roc_auc:.4f}")
@@ -99,7 +139,7 @@ plt.legend()
 plt.savefig(f'{save_dir}/roc_curve.png')
 
 # precision-recall curve
-precision, recall, thresholds = precision_recall_curve(y_test, y_pred_proba)
+precision, recall, _ = precision_recall_curve(y_test, y_pred_proba)
 pr_auc = auc(recall, precision)
 plt.figure(figsize=(6, 4))
 plt.plot(recall, precision, label=f"PR AUC = {pr_auc:.4f}")
@@ -112,13 +152,16 @@ plt.savefig(f'{save_dir}/precision_recall_curve.png')
 print(f"\nROC-AUC: {roc_auc:.4f}")
 print(f"PR-AUC: {pr_auc:.4f}")
 
-# ========================================
 # feature importance
-# ========================================
 plt.figure(figsize=(10, 6))
-xgb_importance = model.feature_importances_
+xgb_importance = final_model.feature_importances_
 sorted_idx = np.argsort(xgb_importance)[::-1][:10]
 sns.barplot(x=X.columns[sorted_idx], y=xgb_importance[sorted_idx])
 plt.title('Top 10 Feature Importances')
 plt.xticks(rotation=45)
 plt.savefig(f'{save_dir}/feature_importances.png')
+
+# save best hyperparameters
+with open(f"{save_dir}/best_hyperparameters.txt", "w") as f:
+    for k, v in study.best_params.items():
+        f.write(f"{k}: {v}\n")

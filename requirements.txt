@@ -17,3 +17,6 @@ jupyter
 
 # For progress bar
 tqdm
+
+# For hyperparameter tuning
+optuna
