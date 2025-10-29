@@ -32,11 +32,11 @@ This severe class imbalance makes fraud detection a challenging problem requirin
 Credit Card Fraud Detection/
 ├── creditcard.csv                    # Dataset
 ├── requirements.txt                  # Dependencies
-├── logistic_regression_training.py  # Logistic Regression model
+├── logistic_regression_training.py   # Logistic Regression model
 ├── neural_network_training.py       # PyTorch Neural Network
-├── random_forest_training.py       # Random Forest model
-├── xgboost_training.py             # XGBoost model
-├── results_1/                      # Generated results
+├── random_forest_training.py        # Random Forest model
+├── xgboost_training.py              # XGBoost model
+├── results_best/                    # Generated best results
 │   ├── logistic_regression/
 │   ├── neural_network/
 │   ├── random_forest/
@@ -48,7 +48,7 @@ Credit Card Fraud Detection/
 
 1. **Clone the repository**:
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/Thisen-Ekanayake/fraud-detection-ml-benchmark.git
    cd "Credit Card Fraud Detection"
    ```
 
@@ -79,8 +79,7 @@ Credit Card Fraud Detection/
 - `torchvision` - Computer vision utilities
 - `torchaudio` - Audio processing
 
-### Development
-- `jupyter` - Interactive notebooks
+
 
 ## 🏃‍♂️ Usage
 
@@ -117,52 +116,32 @@ Each model generates:
 
 ## 📈 Model Performance
 
-Based on the generated results:
+Based on the best results:
 
-| Model | ROC-AUC | Precision | Recall | F1-Score |
-|-------|---------|-----------|--------|----------|
-| **Neural Network** | ~0.99+ | 0.8370 | 0.7857 | 0.8105 |
-| **XGBoost** | ~0.99+ | 0.8384 | 0.8469 | 0.8426 |
-| **Random Forest** | ~0.99+ | 0.8081 | 0.8163 | 0.8122 |
-| **Logistic Regression** | ~0.99+ | 0.0608 | 0.9184 | 0.1141 |
+| Model | Precision | Recall | F1-Score | Accuracy |
+|-------|-----------|--------|----------|----------|
+| **XGBoost** | **0.8632** | **0.8367** | **0.8497** | **0.9995** |
+| **Random Forest** | 0.8081 | 0.8163 | 0.8122 | 0.9994 |
+| **Neural Network** | 0.7979 | 0.7653 | 0.7812 | 0.9993 |
+| **Logistic Regression** | 0.8310 | 0.6020 | 0.6982 | 0.9991 |
+
+### Why XGBoost is Best for Tabular Imbalanced Datasets:
+
+**XGBoost** emerges as the superior choice for this credit card fraud detection task due to several key advantages:
+
+1. **Superior Performance**: Highest F1-score (0.8497) and precision (0.8632) among all algorithms
+2. **Built-in Imbalance Handling**: `scale_pos_weight` parameter automatically adjusts for class imbalance
+3. **Robust Feature Learning**: Gradient boosting excels at capturing complex patterns in tabular data
+4. **Regularization**: Built-in L1/L2 regularization prevents overfitting
+5. **Efficiency**: Fast training and prediction, suitable for production environments
+6. **Interpretability**: Feature importance scores provide insights into fraud indicators
 
 ### Key Insights:
-- **Neural Network** and **XGBoost** show the best balance of precision and recall
-- **Logistic Regression** has high recall but very low precision (many false positives)
-- All models achieve excellent ROC-AUC scores (>0.99)
+- **XGBoost** achieves the best balance of precision and recall for fraud detection
+- **Random Forest** shows competitive performance with good stability
+- **Neural Network** performs well but requires more computational resources
+- **Logistic Regression** has high precision but lower recall, missing more fraud cases
 
-## 🔧 Model Configurations
-
-### Logistic Regression
-- **Solver**: L-BFGS
-- **Class Weight**: Balanced
-- **Max Iterations**: 1000
-- **Preprocessing**: StandardScaler on all features
-
-### Neural Network (PyTorch)
-- **Architecture**: 3-layer MLP (input → 64 → 32 → 1)
-- **Activation**: ReLU + Sigmoid
-- **Dropout**: 0.3 (layer 1), 0.2 (layer 2)
-- **Loss**: Binary Cross-Entropy with positive class weighting
-- **Optimizer**: Adam (lr=0.001)
-- **Epochs**: 50
-- **Batch Size**: 2048
-
-### Random Forest
-- **Estimators**: 300
-- **Max Depth**: 10
-- **Class Weight**: Balanced
-- **Parallel Processing**: Enabled (n_jobs=-1)
-- **Preprocessing**: StandardScaler on Time and Amount features
-
-### XGBoost
-- **Estimators**: 400
-- **Learning Rate**: 0.05
-- **Max Depth**: 5
-- **Subsample**: 0.8
-- **Column Sampling**: 0.8
-- **Scale Pos Weight**: Automatically calculated
-- **Evaluation Metric**: AUC
 
 ## 📊 Evaluation Metrics
 
@@ -193,35 +172,6 @@ The project uses multiple evaluation metrics suitable for imbalanced datasets:
 - **Feature Importance**: Bar plots for top 10 most important features
 - **Consistent Styling**: All plots use seaborn for professional appearance
 
-## 🔍 Results Analysis
-
-The `results_1/` directory contains comprehensive outputs for each model:
-
-```
-results_1/
-├── logistic_regression/
-│   ├── classification_report.txt
-│   ├── confusion_matrix.png
-│   ├── precision_recall_curve.png
-│   └── roc_curve.png
-├── neural_network/
-│   ├── classification_report.txt
-│   ├── confusion_matrix.png
-│   ├── precision-recall_curve.png
-│   └── roc_curve.png
-├── random_forest/
-│   ├── classification_report.txt
-│   ├── confusion_matrix.png
-│   ├── feature_importance.png
-│   ├── precision-recall_curve.png
-│   └── roc_curve.png
-└── xgboost/
-    ├── classification_report.txt
-    ├── confusion_matrix.png
-    ├── feature_importances.png
-    ├── precision_recall_curve.png
-    └── roc_curve.png
-```
 
 ## 🚨 Important Notes
 
@@ -229,16 +179,50 @@ results_1/
 2. **GPU Support**: Neural network training will automatically use GPU if available
 3. **Memory Requirements**: Neural network training may require significant RAM for large batch sizes
 4. **Reproducibility**: All models use `random_state=42` for consistent results
+5. **Class Imbalance**: This dataset has severe class imbalance (0.17% fraud cases) - consider this when interpreting results
+6. **Feature Engineering**: The V1-V28 features are PCA-transformed and anonymized for privacy
+7. **Evaluation**: Focus on precision-recall metrics rather than accuracy due to class imbalance
 
 ## 🤝 Contributing
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+We welcome contributions to improve this fraud detection project! Here's how you can help:
+
+1. **Fork the repository** and create a feature branch
+2. **Add new algorithms** (e.g., LightGBM, CatBoost, SVM)
+3. **Improve preprocessing** techniques for better feature engineering
+4. **Enhance evaluation** with additional metrics (e.g., Matthews Correlation Coefficient)
+5. **Add ensemble methods** combining multiple algorithms
+6. **Optimize hyperparameters** using advanced techniques (e.g., Optuna, Hyperopt)
+7. **Add tests** for model validation and reproducibility
+8. **Submit a pull request** with detailed description of changes
+
+### Areas for Improvement:
+- **Feature Engineering**: Create new features from Time and Amount
+- **Advanced Sampling**: Implement ADASYN, BorderlineSMOTE, or other techniques
+- **Model Interpretability**: Add SHAP values or LIME explanations
+- **Real-time Detection**: Implement streaming prediction capabilities
+- **Cross-validation**: Add stratified k-fold validation for robust evaluation
 
 ## 🙏 Acknowledgments
 
+### Dataset & Research
 - **Dataset**: [Credit Card Fraud Detection](https://www.kaggle.com/mlg-ulb/creditcardfraud) from Kaggle
-- **Libraries**: scikit-learn, PyTorch, XGBoost, and the Python data science ecosystem
+- **Data Privacy**: Features V1-V28 are PCA-transformed for confidentiality
+
+### Libraries & Frameworks
+- **scikit-learn**: Core machine learning algorithms and utilities
+- **PyTorch**: Deep learning framework for neural network implementation
+- **XGBoost**: Gradient boosting framework for superior tabular data performance
+- **imbalanced-learn**: Specialized tools for handling class imbalance
+- **matplotlib & seaborn**: Data visualization and plotting
+- **pandas & numpy**: Data manipulation and numerical computing
+
+### Community
+- **Kaggle Community**: For dataset availability and ML discussions
+- **Python Data Science Ecosystem**: Open-source tools and libraries
+- **Machine Learning Community**: Research papers and best practices for fraud detection
+
+### Special Thanks
+- Contributors who helped improve model performance
+- Reviewers who provided feedback on evaluation metrics
+- The open-source community for maintaining these excellent tools
