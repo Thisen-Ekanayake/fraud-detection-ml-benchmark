@@ -1,7 +1,6 @@
 import pandas as pd
 import numpy as np
 import os
-import optuna
 from tqdm import tqdm
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
@@ -40,65 +39,24 @@ scale_pos_weight = len(y_train[y_train == 0]) / len(y_train[y_train == 1])
 print("scale_pos_weight:", scale_pos_weight)
 
 # ========================================
-# optuna objective function
+# train model
 # ========================================
-def objective(trial):
-    params = {
-        'n_estimators': trial.suggest_int('n_estimators', 200, 800),
-        'learning_rate': trial.suggest_float('learning_rate', 0.001, 0.3, log=True),
-        'max_depth': trial.suggest_int('max_depth', 3, 10),
-        'subsample': trial.suggest_float('subsample', 0.5, 1.0),
-        'colsample_bytree': trial.suggest_float('colsample_bytree', 0.5, 1.0),
-        'gamma': trial.suggest_float('gamma', 0.0, 5.0),
-        'min_child_weight': trial.suggest_int('min_child_weight', 1, 10),
-        'scale_pos_weight': scale_pos_weight,
-        'eval_metric': 'auc',
-        'early_stopping_rounds': 30,
-        'random_state': 42,
-        'n_jobs': -1,
-    }
-
-    model = XGBClassifier(**params)
-
-    model.fit(
-        X_train, y_train,
-        eval_set=[(X_test, y_test)],
-        verbose=False
-    )
-
-    y_pred_proba = model.predict_proba(X_test)[:, 1]
-    roc_auc = roc_auc_score(y_test, y_pred_proba)
-    return roc_auc
-
-
-
-# ========================================
-# run optuna hyperparameter tuning
-# ========================================
-print("\nStarting Optuna hyperparameter tuning...\n")
-
-study = optuna.create_study(direction='maximize')
-# Optuna already has a progress bar built-in
-study.optimize(objective, n_trials=30, show_progress_bar=True)
-
-print("\nBest ROC-AUC score:", study.best_value)
-print("Best hyperparameters:")
-for key, value in study.best_params.items():
-    print(f"  {key}: {value}")
-
-# ========================================
-# train final model using best parameters
-# ========================================
-best_params = study.best_params
-best_params.update({
+params = {
+    'n_estimators': 500,
+    'learning_rate': 0.05,
+    'max_depth': 6,
+    'subsample': 0.8,
+    'colsample_bytree': 0.8,
+    'gamma': 1.0,
+    'min_child_weight': 5,
     'scale_pos_weight': scale_pos_weight,
     'eval_metric': 'auc',
     'random_state': 42,
-    'n_jobs': -1
-})
+    'n_jobs': -1,
+}
 
-print("\nTraining final model...")
-final_model = XGBClassifier(**best_params)
+print("\nTraining model...")
+final_model = XGBClassifier(**params)
 final_model.fit(X_train, y_train)
 
 # ========================================
@@ -181,9 +139,9 @@ with tqdm(total=len(tasks), desc="Saving & Plotting", ncols=100) as pbar:
     plt.close()
     pbar.update(1)
 
-    # save best hyperparameters
+    # save hyperparameters
     with open(f"{save_dir}/best_hyperparameters.txt", "w") as f:
-        for k, v in study.best_params.items():
+        for k, v in params.items():
             f.write(f"{k}: {v}\n")
     pbar.update(1)
 
