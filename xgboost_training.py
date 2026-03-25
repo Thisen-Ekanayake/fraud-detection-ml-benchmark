@@ -2,12 +2,12 @@ import pandas as pd
 import numpy as np
 import os
 from tqdm import tqdm
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, StratifiedKFold
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import (
     confusion_matrix, classification_report,
     roc_auc_score, precision_recall_curve,
-    auc, roc_curve
+    auc, roc_curve, accuracy_score, precision_score, recall_score, f1_score
 )
 from xgboost import XGBClassifier
 import matplotlib.pyplot as plt
@@ -54,6 +54,46 @@ params = {
     'random_state': 42,
     'n_jobs': -1,
 }
+
+print("\nRunning 5-fold cross validation...")
+cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+
+fold_metrics = {'accuracy': [], 'precision': [], 'recall': [], 'f1': [], 'roc_auc': [], 'pr_auc': []}
+X_train_arr, y_train_arr = X_train.to_numpy(), y_train.to_numpy()
+
+header = f"{'Fold':<6} {'Accuracy':>10} {'Precision':>10} {'Recall':>10} {'F1':>10} {'ROC-AUC':>10} {'PR-AUC':>10}"
+print(header)
+print("-" * len(header))
+
+for fold, (tr_idx, val_idx) in enumerate(cv.split(X_train_arr, y_train_arr), 1):
+    X_tr, X_val = X_train_arr[tr_idx], X_train_arr[val_idx]
+    y_tr, y_val = y_train_arr[tr_idx], y_train_arr[val_idx]
+
+    fold_model = XGBClassifier(**params)
+    fold_model.fit(X_tr, y_tr)
+    y_val_pred = fold_model.predict(X_val)
+    y_val_proba = fold_model.predict_proba(X_val)[:, 1]
+
+    acc  = accuracy_score(y_val, y_val_pred)
+    prec = precision_score(y_val, y_val_pred, zero_division=0)
+    rec  = recall_score(y_val, y_val_pred, zero_division=0)
+    f1   = f1_score(y_val, y_val_pred, zero_division=0)
+    rauc = roc_auc_score(y_val, y_val_proba)
+    p, r, _ = precision_recall_curve(y_val, y_val_proba)
+    prauc = auc(r, p)
+
+    for key, val in zip(fold_metrics, [acc, prec, rec, f1, rauc, prauc]):
+        fold_metrics[key].append(val)
+
+    print(f"{fold:<6} {acc:>10.4f} {prec:>10.4f} {rec:>10.4f} {f1:>10.4f} {rauc:>10.4f} {prauc:>10.4f}")
+
+print("-" * len(header))
+means = {k: np.mean(v) for k, v in fold_metrics.items()}
+stds  = {k: np.std(v)  for k, v in fold_metrics.items()}
+print(f"{'Mean':<6} {means['accuracy']:>10.4f} {means['precision']:>10.4f} {means['recall']:>10.4f} {means['f1']:>10.4f} {means['roc_auc']:>10.4f} {means['pr_auc']:>10.4f}")
+print(f"{'Std':<6} {stds['accuracy']:>10.4f} {stds['precision']:>10.4f} {stds['recall']:>10.4f} {stds['f1']:>10.4f} {stds['roc_auc']:>10.4f} {stds['pr_auc']:>10.4f}")
+
+cv_results = fold_metrics
 
 print("\nTraining model...")
 final_model = XGBClassifier(**params)
@@ -144,6 +184,23 @@ with tqdm(total=len(tasks), desc="Saving & Plotting", ncols=100) as pbar:
         for k, v in params.items():
             f.write(f"{k}: {v}\n")
     pbar.update(1)
+
+# save cross validation results
+with open(f"{save_dir}/cv_results.txt", "w") as f:
+    f.write("5-Fold Cross Validation Results:\n\n")
+    f.write(f"{'Fold':<6} {'Accuracy':>10} {'Precision':>10} {'Recall':>10} {'F1':>10} {'ROC-AUC':>10} {'PR-AUC':>10}\n")
+    f.write("-" * 66 + "\n")
+    for i in range(5):
+        f.write(f"{i+1:<6} {cv_results['accuracy'][i]:>10.4f} {cv_results['precision'][i]:>10.4f} "
+                f"{cv_results['recall'][i]:>10.4f} {cv_results['f1'][i]:>10.4f} "
+                f"{cv_results['roc_auc'][i]:>10.4f} {cv_results['pr_auc'][i]:>10.4f}\n")
+    f.write("-" * 66 + "\n")
+    f.write(f"{'Mean':<6} {np.mean(cv_results['accuracy']):>10.4f} {np.mean(cv_results['precision']):>10.4f} "
+            f"{np.mean(cv_results['recall']):>10.4f} {np.mean(cv_results['f1']):>10.4f} "
+            f"{np.mean(cv_results['roc_auc']):>10.4f} {np.mean(cv_results['pr_auc']):>10.4f}\n")
+    f.write(f"{'Std':<6} {np.std(cv_results['accuracy']):>10.4f} {np.std(cv_results['precision']):>10.4f} "
+            f"{np.std(cv_results['recall']):>10.4f} {np.std(cv_results['f1']):>10.4f} "
+            f"{np.std(cv_results['roc_auc']):>10.4f} {np.std(cv_results['pr_auc']):>10.4f}\n")
 
 print(f"\nROC-AUC: {roc_auc:.4f}")
 print(f"PR-AUC: {pr_auc:.4f}")
