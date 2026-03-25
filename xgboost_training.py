@@ -9,6 +9,7 @@ from sklearn.metrics import (
     roc_auc_score, precision_recall_curve,
     auc, roc_curve, accuracy_score, precision_score, recall_score, f1_score
 )
+from imblearn.over_sampling import SMOTE
 from xgboost import XGBClassifier
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -16,7 +17,7 @@ import seaborn as sns
 # ========================================
 # load and preprocess the data
 # ========================================
-df = pd.read_csv('creditcard.csv')
+df = pd.read_csv('data/train.csv')
 
 print("Dataset shape:", df.shape)
 print(df['Class'].value_counts())
@@ -34,9 +35,11 @@ X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=42, stratify=y
 )
 
-# compute scale_pos_weight for imbalance handling
-scale_pos_weight = len(y_train[y_train == 0]) / len(y_train[y_train == 1])
-print("scale_pos_weight:", scale_pos_weight)
+# oversample minority class with SMOTE
+print("Class distribution before SMOTE:", dict(zip(*np.unique(y_train, return_counts=True))))
+smote = SMOTE(random_state=42)
+X_train, y_train = smote.fit_resample(X_train, y_train)
+print("Class distribution after SMOTE:", dict(zip(*np.unique(y_train, return_counts=True))))
 
 # ========================================
 # train model
@@ -49,7 +52,6 @@ params = {
     'colsample_bytree': 0.8,
     'gamma': 1.0,
     'min_child_weight': 5,
-    'scale_pos_weight': scale_pos_weight,
     'eval_metric': 'auc',
     'random_state': 42,
     'n_jobs': -1,
@@ -109,7 +111,7 @@ y_pred_proba = final_model.predict_proba(X_test)[:, 1]
 # ========================================
 # evaluate and save results
 # ========================================
-save_dir = "results_best/xgboost"
+save_dir = "results_smote_train/xgboost"
 os.makedirs(save_dir, exist_ok=True)
 
 tasks = [
