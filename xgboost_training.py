@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import os
+import joblib
 from tqdm import tqdm
 from sklearn.model_selection import train_test_split, StratifiedKFold
 from sklearn.preprocessing import StandardScaler
@@ -100,6 +101,12 @@ cv_results = fold_metrics
 print("\nTraining model...")
 final_model = XGBClassifier(**params)
 final_model.fit(X_train, y_train)
+
+# export model and scaler for inference
+os.makedirs("models", exist_ok=True)
+final_model.save_model("models/xgboost_fraud.json")
+joblib.dump(scaler, "models/scaler.joblib")
+print("Model saved to models/xgboost_fraud.json")
 
 # ========================================
 # predictions
