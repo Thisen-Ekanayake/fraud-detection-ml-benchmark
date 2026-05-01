@@ -6,5 +6,10 @@ __pycache__/
 *.png
 *.json
 *.joblib
+*.md
+*.pdf
+*.npy
+*.tex
+*.bib
 
 !requirements.txt
